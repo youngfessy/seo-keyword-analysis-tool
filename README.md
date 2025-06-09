@@ -72,21 +72,14 @@ The tool will:
 
 ### 4. Launch Interactive Dashboards
 
-#### Multi-Channel Dashboard (SEO + AEO/GEO)
-```bash
-./launch_multi_dashboard.sh
-# Or directly: streamlit run multi_dashboard.py --server.port 8502
-```
-
-#### Full SEO Dashboard (Complete Analysis)
+#### SEO Dashboard
 ```bash
 ./launch_dashboard.sh
 # Or directly: streamlit run dashboard.py
 ```
 
-The dashboards provide:
-- **🔍 SEO Tab**: Complete keyword opportunity analysis with filtering, sorting, and management
-- **🤖 AEO/GEO Tab**: Answer and generative engine optimization analysis
+The dashboard provides:
+- **Complete keyword opportunity analysis** with filtering, sorting, and management
 - **Interactive filtering** by priority, opportunity type, position, and score
 - **Sortable columns** with pagination (25/50/100/200 rows per page)
 - **Visual charts** showing priority and opportunity type breakdowns

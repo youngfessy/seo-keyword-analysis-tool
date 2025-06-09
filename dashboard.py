@@ -760,9 +760,9 @@ def display_glossary():
     The Opportunity Score is calculated using four weighted factors:
     
     - **Position Score (40%)**: Higher ranking positions receive higher scores
-    - **Volume Score (30%)**: Keywords with more monthly impressions get higher scores  
-    - **CTR Gap Score (20%)**: Larger gaps between current and expected CTR increase the score
-    - **Traffic Score (10%)**: Potential for additional monthly clicks
+    - **Volume Score (30%)**: Keywords with more monthly impressions get higher scores
+    - **Traffic Score (20%)**: Potential for improved CTR based on an improvement in positioning by 1 position
+    - **CTR Gap Score (10%)**: Larger gaps between current and expected CTR increase the score
     
     This creates a balanced score that prioritizes keywords with the best combination of existing visibility, traffic potential, and optimization opportunity.
     """)

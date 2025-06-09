@@ -53,19 +53,19 @@ class KeywordOpportunity:
     
     def _calculate_opportunity_score(self) -> float:
         """Calculate overall opportunity score (0-100)."""
-        # Position score (closer to top = higher score)
+        # Position score (closer to top = higher score) - 40%
         position_score = max(0, (101 - self.average_position) / 100) * 40
         
-        # Traffic volume score
+        # Volume score (keywords with more impressions get higher scores) - 30%
         volume_score = min(np.log10(max(1, self.impressions)) / 4, 1) * 30
         
-        # CTR gap score
-        ctr_score = min(self.ctr_potential * 100, 1) * 20
+        # Traffic score (potential CTR improvement for 1 position jump) - 20%
+        traffic_score = min(self.traffic_potential / 100, 1) * 20
         
-        # Click potential score  
-        click_score = min(self.traffic_potential / 100, 1) * 10
+        # CTR gap score (larger gaps between current and expected CTR) - 10%
+        ctr_gap_score = min(self.ctr_potential * 100, 1) * 10
         
-        return min(100, position_score + volume_score + ctr_score + click_score)
+        return min(100, position_score + volume_score + traffic_score + ctr_gap_score)
     
     def _determine_opportunity_type(self) -> str:
         """Determine the type of opportunity."""
