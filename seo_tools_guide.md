@@ -1,6 +1,5 @@
 # Comprehensive Guide: Ahrefs & Google Search Console for SEO/GEO/AEO
 
-## Ahrefs: Complete SEO Intelligence Platform
 
 ### Core Data Sources & Capabilities
 
@@ -17,51 +16,6 @@
 - Competitor organic traffic estimation and top pages
 - Brand mention monitoring across the web
 
-### SEO Applications with Ahrefs
-
-**Keyword Strategy Development**
-- **Keyword Explorer**: Research keywords with accurate search volumes and difficulty scores
-- Parent topic identification for content clustering
-- Seasonal trend analysis for content planning
-- Question-based keywords for FAQ optimization
-
-**Link Building & Authority Building**
-- **Link Intersect Tool**: Find sites linking to competitors but not to you
-- Resource page discovery for link prospects
-- Brand mention tracking for unlinked mentions
-- Toxic backlink identification for disavowing
-
-### GEO (Generative Engine Optimization) with Ahrefs
-
-**Content Optimization for AI Engines**
-- Identify question-based keywords that AI engines prioritize
-- Analyze featured snippet opportunities that feed AI responses
-- Track knowledge panel appearances and optimize for entity recognition
-- Monitor brand mentions that influence AI model training data
-- Research topical authority signals through content clusters
-
-**Structured Data & Entity Optimization**
-- Use Site Audit to ensure proper schema markup implementation
-- Track rich snippet appearances that inform AI responses
-- Analyze competitor structured data strategies
-- Monitor entity relationships through keyword clustering
-- Optimize for E-E-A-T signals that AI engines value (Experience, Expertise, Authority, and Trustworthiness)
-
-### AEO (Answer Engine Optimization) with Ahrefs
-
-**Featured Snippet Optimization**
-- **SERP Features Report**: Track all featured snippet opportunities
-- Analyze competitor snippet content formats and lengths
-- Identify question keywords with high snippet potential
-- Monitor snippet losses and gains over time
-- Optimize content structure for answer box formats
-
-**Voice Search & Conversational Queries**
-- Track long-tail, conversational keyword opportunities
-- Analyze question-based search patterns and volumes
-- Identify local voice search opportunities
-- Monitor "near me" and location-based query performance
-- Research FAQ-style content opportunities
 
 ## Google Search Console: Direct Google Intelligence
 
@@ -105,12 +59,12 @@
 **AI Training Data Optimization**
 - Monitor which pages Google is crawling most frequently
 - Track structured data implementation success rates
-- Identify content that appears in featured snippets
+- Identify content that appears in featured snippets and SERP
 - Monitor entity recognition through search appearance data
 - Analyze query data to understand AI-driven search patterns
 
 **Authority & Trustworthiness Signals**
-- Track E-A-T signal performance through search visibility
+- Track E-E-A-T signal performance through search visibility
 - Monitor author and organization entity recognition
 - Analyze brand query performance and awareness metrics
 - Track citation and reference content performance
@@ -121,27 +75,17 @@
 **Answer-Focused Content Performance**
 - **Filter by query type** to analyze question-based searches
 - Track featured snippet appearances and performance
-- Monitor voice search query patterns and optimization opportunities
-- Analyze local search performance for "near me" queries
+- Track SERP appearances and opportunities
 - Identify FAQ and how-to content performance metrics
 
-**Conversational Search Optimization**
-- Track long-tail, natural language query performance
-- Monitor mobile vs. desktop query differences
-- Analyze regional search pattern variations
-- Track multilingual search performance for global optimization
-- Identify conversation-starter content opportunities
 
 ## Integration Strategy: Using Both Tools Together
 
 ### Comprehensive Keyword Strategy
-1. **Research Phase**: Use Ahrefs Keyword Explorer for volume and competition data
-2. **Validation Phase**: Cross-reference with GSC actual performance data
-3. **Opportunity Identification**: Find Ahrefs-suggested keywords you're not tracking in GSC
-4. **Performance Monitoring**: Use GSC to track real-world performance of Ahrefs-identified opportunities
+1. **Research Phase**: Use GSC Explorer for volume, performance, and competition data
 
 ### Competitive Intelligence & Gap Analysis
-1. **Competitor Research**: Use Ahrefs to identify competitor strengths and content gaps
+1. **Competitor Research**: Use GSC to identify competitor strengths and content gaps
 2. **Performance Validation**: Check GSC to see your actual performance in those areas
 3. **Link Building Strategy**: Use Ahrefs for prospect identification, GSC for measuring impact
 4. **Content Optimization**: Combine Ahrefs content suggestions with GSC user behavior data

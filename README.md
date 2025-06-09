@@ -1,13 +1,20 @@
-# GSC Keyword Opportunity Analyzer
+# SEO/AEO/GEO Analysis Tool
 
-A comprehensive keyword analysis tool for **synthesis.com/tutor** that uses Google Search Console data to identify high-impact SEO opportunities.
+A comprehensive multi-channel search optimization tool for **synthesis.com/tutor** that uses Google Search Console data to identify opportunities across traditional SEO, Answer Engine Optimization (AEO), and Generative Engine Optimization (GEO).
 
 ## 🎯 What It Does
 
+### 🔍 SEO Analysis
 - **Analyzes non-brand keywords** ranking in top 100 positions for synthesis.com/tutor
 - **Identifies optimization opportunities** based on position, impressions, CTR, and traffic potential
 - **Prioritizes keywords** by opportunity score and potential impact
 - **Exports detailed analysis** to CSV for further review and action planning
+
+### 🤖 AEO/GEO Analysis
+- **Answer Engine Optimization**: Identifies question-based queries for featured snippets and voice search
+- **Generative Engine Optimization**: Analyzes content for AI chatbot and generative search optimization
+- **SERP Feature Targeting**: Identifies opportunities for FAQ, How-To, and Knowledge Panel optimization
+- **Intent Classification**: Categorizes queries by type (Question-Based, Definition, Comparison, How-To, etc.)
 
 ## 📊 Key Features
 
@@ -63,13 +70,23 @@ The tool will:
 - Filter out brand keywords and low-impact terms
 - Analyze opportunities and export results
 
-### 4. Launch Interactive Dashboard
+### 4. Launch Interactive Dashboards
+
+#### Multi-Channel Dashboard (SEO + AEO/GEO)
 ```bash
-./launch_dashboard.sh
-# Or directly: python3 -m streamlit run dashboard.py
+./launch_multi_dashboard.sh
+# Or directly: streamlit run multi_dashboard.py --server.port 8502
 ```
 
-The dashboard provides:
+#### Full SEO Dashboard (Complete Analysis)
+```bash
+./launch_dashboard.sh
+# Or directly: streamlit run dashboard.py
+```
+
+The dashboards provide:
+- **🔍 SEO Tab**: Complete keyword opportunity analysis with filtering, sorting, and management
+- **🤖 AEO/GEO Tab**: Answer and generative engine optimization analysis
 - **Interactive filtering** by priority, opportunity type, position, and score
 - **Sortable columns** with pagination (25/50/100/200 rows per page)
 - **Visual charts** showing priority and opportunity type breakdowns
@@ -119,4 +136,23 @@ Edit `config.py` to customize:
 4. **Scoring**: Assigns 0-100 opportunity scores based on multiple factors
 5. **Export**: Generates actionable CSV report for SEO team
 
-Built specifically for synthesis.com/tutor's SEO optimization strategy. 
+Built specifically for synthesis.com/tutor's multi-channel search optimization strategy, covering traditional SEO, Answer Engine Optimization (AEO), and Generative Engine Optimization (GEO).
+
+## 🤖 AEO/GEO Features
+
+### Answer Engine Optimization (AEO)
+- **Question-Based Query Analysis**: Identifies how/what/why/when queries for featured snippets
+- **SERP Feature Targeting**: Opportunities for FAQ, How-To, and Knowledge Panel optimization
+- **Answer Potential Scoring**: Prioritizes queries by optimization potential
+- **Voice Search Optimization**: Targets natural language and conversational queries
+
+### Generative Engine Optimization (GEO)  
+- **AI Training Data Analysis**: Identifies content that AI models may reference
+- **Entity Recognition**: Tracks brand and topic entity mentions
+- **Authority Signal Analysis**: Monitors E-A-T (Expertise, Authoritativeness, Trustworthiness) indicators
+- **Context Optimization**: Analyzes comprehensive content for AI understanding
+
+### Multi-Dashboard Access
+- **Combined View**: Single dashboard with SEO and AEO/GEO tabs
+- **Specialized Analysis**: Dedicated views for each optimization channel
+- **Real-time GSC Data**: Fresh data from Google Search Console for all analyses 
