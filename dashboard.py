@@ -16,13 +16,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import re
 
-# Page configuration
-st.set_page_config(
-    page_title="SEO Keyword Opportunities Dashboard",
-    page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Page configuration will be handled by main app
 
 # Custom CSS for dark mode table and improved styling
 st.markdown("""
@@ -156,21 +150,45 @@ def classify_search_intent(keyword):
     # Default to informational for educational content
     return 'Informational'
 
-@st.cache_data
+def load_deleted_keywords():
+    """Load permanently deleted keywords from file (same as AEO dashboard)."""
+    deleted_file = "deleted_aeo_keywords.txt"
+    if os.path.exists(deleted_file):
+        with open(deleted_file, 'r') as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
 def load_latest_data():
-    """Load the most recent keyword opportunities CSV file and enhance with additional data."""
-    # Find the most recent CSV file
+    """Load keyword opportunities data - either from CSV files or generate from GSC data."""
+    # First try to find CSV files (for local development)
     csv_files = glob.glob("keyword_opportunities_*.csv")
-    if not csv_files:
-        return None, None
-    
-    latest_file = max(csv_files, key=os.path.getctime)
-    df = pd.read_csv(latest_file)
-    
-    # Convert percentage strings to float
-    df['Current CTR'] = df['Current CTR'].str.rstrip('%').astype(float) / 100
-    df['CTR Potential'] = df['CTR Potential'].str.rstrip('%').astype(float) / 100
-    
+    if csv_files:
+        latest_file = max(csv_files, key=os.path.getctime)
+        df = pd.read_csv(latest_file)
+        
+        # Convert percentage strings to float
+        df['Current CTR'] = df['Current CTR'].str.rstrip('%').astype(float) / 100
+        df['CTR Potential'] = df['CTR Potential'].str.rstrip('%').astype(float) / 100
+        
+        # Filter out permanently deleted keywords
+        deleted_keywords = load_deleted_keywords()
+        if deleted_keywords:
+            df = df[~df['Keyword'].isin(deleted_keywords)].copy()
+        
+        return enhance_data_with_ahrefs(df), latest_file
+    else:
+        # Generate data from GSC (for cloud deployment)
+        data = generate_opportunities_from_gsc()
+        if data is not None:
+            # Filter out permanently deleted keywords from live data too
+            deleted_keywords = load_deleted_keywords()
+            if deleted_keywords:
+                data = data[~data['Keyword'].isin(deleted_keywords)].copy()
+        return data, "live_data"
+
+def enhance_data_with_ahrefs(df):
+    """Enhance dataframe with Ahrefs data and additional columns."""
     # Add new columns if they don't exist
     if 'Keyword Difficulty' not in df.columns:
         df['Keyword Difficulty'] = df['Keyword'].apply(estimate_keyword_difficulty)
@@ -183,19 +201,175 @@ def load_latest_data():
     
     # Add real search volume from Ahrefs with fallback to estimates
     if 'Est. Monthly Volume' not in df.columns:
-        from ahrefs_data_loader import get_real_search_volume, has_ahrefs_data
-        
-        df['Est. Monthly Volume'] = df.apply(
-            lambda row: get_real_search_volume(row['Keyword'], row['Monthly Impressions']), 
-            axis=1
-        )
-        
-        # Add data source indicator
-        df['Data Source'] = df['Keyword'].apply(
-            lambda keyword: 'Ahrefs' if has_ahrefs_data(keyword) else 'GSC Est.'
-        )
+        try:
+            from ahrefs_data_loader import get_real_search_volume, has_ahrefs_data
+            
+            df['Est. Monthly Volume'] = df.apply(
+                lambda row: get_real_search_volume(row['Keyword'], row['Monthly Impressions']), 
+                axis=1
+            )
+            
+            # Add data source indicator
+            df['Data Source'] = df['Keyword'].apply(
+                lambda keyword: 'Ahrefs' if has_ahrefs_data(keyword) else 'GSC Est.'
+            )
+        except ImportError:
+            # If Ahrefs data loader not available, use estimated volume
+            df['Est. Monthly Volume'] = df['Monthly Impressions'] * 5  # Conservative estimate
+            df['Data Source'] = 'GSC Est.'
     
-    return df, latest_file
+    return df
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def generate_opportunities_from_gsc():
+    """Generate keyword opportunities data directly from Google Search Console."""
+    try:
+        # Import GSC client
+        from gsc_client import GSCClient
+        
+        with st.spinner("🔄 Fetching live data from Google Search Console..."):
+            # Initialize and authenticate GSC client
+            gsc_client = GSCClient()
+            gsc_client.authenticate()
+            
+            # Fetch search analytics data
+            df_raw = gsc_client.get_search_analytics_data()
+            
+            if df_raw is None or df_raw.empty:
+                st.error("No data returned from Google Search Console")
+                return None
+            
+            # Filter the data
+            df_filtered = gsc_client.filter_data(df_raw)
+            
+            if df_filtered.empty:
+                st.error("No data remaining after filtering")
+                return None
+            
+            # Process the data to create opportunities analysis
+            df_opportunities = process_gsc_data_for_opportunities(df_filtered)
+            
+            return enhance_data_with_ahrefs(df_opportunities)
+            
+    except Exception as e:
+        st.error(f"Error generating opportunities from GSC: {str(e)}")
+        return None
+
+def process_gsc_data_for_opportunities(df):
+    """Process raw GSC data into keyword opportunities format."""
+    # Create the opportunities dataframe
+    opportunities = []
+    
+    for _, row in df.iterrows():
+        keyword = row['query']
+        position = row['position']
+        impressions = row['impressions']
+        clicks = row['clicks']
+        ctr = row['ctr']
+        
+        # Calculate CTR benchmarks and opportunities
+        expected_ctr = get_expected_ctr_for_position(position)
+        ctr_gap = max(0, expected_ctr - ctr)
+        traffic_potential = int(impressions * ctr_gap)
+        
+        # Calculate opportunity score (using same logic as keyword_analyzer.py)
+        opportunity_score = calculate_opportunity_score(position, impressions, ctr_gap)
+        
+        # Determine opportunity type
+        opportunity_type = determine_opportunity_type(position, ctr, expected_ctr)
+        
+        # Determine priority
+        priority = determine_priority(opportunity_score)
+        
+        opportunities.append({
+            'Keyword': keyword,
+            'Current Position': position,
+            'Monthly Impressions': impressions,
+            'Monthly Clicks': clicks,
+            'Current CTR': ctr,
+            'Expected CTR': expected_ctr,
+            'CTR Potential': ctr_gap,
+            'Traffic Potential': traffic_potential,
+            'Opportunity Score': opportunity_score,
+            'Opportunity Type': opportunity_type,
+            'Priority': priority
+        })
+    
+    return pd.DataFrame(opportunities)
+
+def get_expected_ctr_for_position(position):
+    """Get expected CTR based on position."""
+    # CTR benchmarks by position
+    ctr_by_position = {
+        1: 0.31, 2: 0.24, 3: 0.18, 4: 0.13, 5: 0.09,
+        6: 0.06, 7: 0.04, 8: 0.03, 9: 0.025, 10: 0.02
+    }
+    
+    if position <= 10:
+        # Interpolate for positions 1-10
+        pos_floor = int(position)
+        pos_ceil = min(10, pos_floor + 1)
+        
+        if pos_floor == pos_ceil:
+            return ctr_by_position.get(pos_floor, 0.02)
+        
+        # Linear interpolation
+        weight = position - pos_floor
+        ctr_floor = ctr_by_position.get(pos_floor, 0.02)
+        ctr_ceil = ctr_by_position.get(pos_ceil, 0.02)
+        
+        return ctr_floor * (1 - weight) + ctr_ceil * weight
+    else:
+        # For positions > 10, use declining CTR
+        return max(0.005, 0.02 * (10 / position))
+
+def calculate_opportunity_score(position, impressions, ctr_gap):
+    """Calculate opportunity score using the updated formula."""
+    # Position Score (40% weight)
+    position_score = max(0, (31 - min(30, position)) / 30) * 100
+    
+    # Volume Score (30% weight) - using impressions as proxy
+    volume_score = min(np.log10(max(1, impressions)) / 4, 1) * 100
+    
+    # Traffic Score (20% weight) - CTR improvement potential
+    traffic_score = min(ctr_gap * 1000, 100)  # Scale CTR gap
+    
+    # Difficulty Score (10% weight) - estimated
+    difficulty_score = 50  # Default moderate difficulty
+    
+    # Calculate weighted score
+    total_score = (
+        position_score * 0.4 +
+        volume_score * 0.3 +
+        traffic_score * 0.2 +
+        difficulty_score * 0.1
+    )
+    
+    return min(100, max(0, total_score))
+
+def determine_opportunity_type(position, actual_ctr, expected_ctr):
+    """Determine the type of SEO opportunity."""
+    ctr_ratio = actual_ctr / expected_ctr if expected_ctr > 0 else 1
+    
+    if position <= 3 and ctr_ratio < 0.7:
+        return "CTR Optimization"
+    elif 4 <= position <= 10:
+        return "Top 3 Push"
+    elif 11 <= position <= 20:
+        return "Top 10 Push"
+    elif 21 <= position <= 30:
+        return "First Page Push"
+    else:
+        return "Long-term Target"
+
+def determine_priority(opportunity_score):
+    """Determine priority level based on opportunity score."""
+    if opportunity_score >= 70:
+        return "High"
+    elif opportunity_score >= 40:
+        return "Medium"
+    else:
+        return "Low"
 
 def save_updated_data(df, filename):
     """Save the updated dataframe back to CSV."""
@@ -627,25 +801,44 @@ def export_filtered_data(df):
             mime="text/csv"
         )
 
+def add_navigation():
+    """Add smart navigation that works both locally and in cloud deployment."""
+    import os
+    
+    # Detect environment
+    is_cloud = os.getenv('STREAMLIT_CLOUD', False) or 'streamlit.app' in os.getenv('STREAMLIT_SERVER_ADDRESS', '')
+    
+    st.sidebar.markdown("## 🧭 Dashboard Navigation")
+    st.sidebar.markdown("**Current:** 🎯 SEO Opportunities")
+    
+    if is_cloud:
+        # For cloud deployment, provide instructions
+        st.sidebar.markdown("### 🤖 AEO/GEO Dashboard")
+        st.sidebar.info("Deploy the `aeo_geo_dashboard.py` as a separate Streamlit app for AEO/GEO analysis")
+    else:
+        # For local development, provide working links
+        st.sidebar.markdown("""
+        <a href="http://localhost:8505" target="_blank" style="
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background-color: #FF6B6B;
+            color: white;
+            text-decoration: none;
+            border-radius: 0.3rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+            text-align: center;
+            width: 200px;
+        ">🤖 Open AEO/GEO Dashboard</a>
+        """, unsafe_allow_html=True)
+        st.sidebar.caption("💡 Run: `streamlit run aeo_geo_dashboard.py --server.port 8505`")
+    
+    st.sidebar.markdown("---")
+
 def main():
     """Main dashboard function."""
     # Navigation
-    st.sidebar.markdown("## 🧭 Navigation")
-    st.sidebar.markdown("**Current:** 🎯 SEO Dashboard")
-    st.sidebar.markdown("""
-    <a href="http://localhost:8505" target="_blank" style="
-        display: inline-block;
-        padding: 0.5rem 1rem;
-        background-color: #FF6B6B;
-        color: white;
-        text-decoration: none;
-        border-radius: 0.3rem;
-        font-weight: bold;
-        margin: 0.5rem 0;
-    ">🤖 Open AEO/GEO Dashboard</a>
-    """, unsafe_allow_html=True)
-    
-    st.sidebar.markdown("---")
+    add_navigation()
     
     # Header
     st.title("🎯 SEO Keyword Opportunities Dashboard")
