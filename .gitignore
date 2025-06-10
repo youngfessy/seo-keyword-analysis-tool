@@ -1,7 +1,14 @@
-# Environment variables
+# Credentials and sensitive data
+credentials.json
+token.json
+token.pickle
+*.env
 .env
-.env.local
-.env.production
+
+# Data files (contain private search console data)
+keyword_opportunities_*.csv
+ahrefs_keyword_data/
+deleted_aeo_keywords.txt
 
 # Python
 __pycache__/
@@ -25,11 +32,41 @@ wheels/
 .installed.cfg
 *.egg
 
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Logs
+*.log
 
 # Output files
 *.xlsx
@@ -38,11 +75,6 @@ output/
 reports/
 
 # OS
-.DS_Store
-Thumbs.db
-
-# Google API credentials
-credentials.json
-token.json
-token.pickle
+.env.local
+.env.production
 .env.backup 

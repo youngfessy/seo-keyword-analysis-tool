@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import plotly.express as px
 import plotly.graph_objects as go
 import re
+import os
 
 # Page configuration
 st.set_page_config(
@@ -101,10 +102,10 @@ def analyze_serp_features(keyword):
     
     return features if features else ['Standard Results']
 
-def estimate_search_volume(impressions):
-    """Estimate total search volume based on impressions (same method as SEO dashboard)."""
-    # Assumes your impressions represent ~10% of total search volume
-    return int((impressions / 0.1))
+def estimate_search_volume(keyword, impressions):
+    """Get real search volume from Ahrefs with fallback to impressions estimate."""
+    from ahrefs_data_loader import get_real_search_volume
+    return get_real_search_volume(keyword, impressions)
 
 def calculate_answer_potential(row):
     """Calculate optimization potential for answer engines."""
@@ -137,22 +138,52 @@ def calculate_answer_potential(row):
     
     return min(100, max(0, score))
 
-@st.cache_data
+def load_deleted_keywords():
+    """Load permanently deleted keywords from file."""
+    deleted_file = "deleted_aeo_keywords.txt"
+    if os.path.exists(deleted_file):
+        with open(deleted_file, 'r') as f:
+            return set(line.strip() for line in f if line.strip())
+    return set()
+
+def save_deleted_keywords(deleted_keywords):
+    """Save permanently deleted keywords to file."""
+    deleted_file = "deleted_aeo_keywords.txt"
+    with open(deleted_file, 'w') as f:
+        for keyword in sorted(deleted_keywords):
+            f.write(f"{keyword}\n")
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def fetch_raw_gsc_data(start_date_str, end_date_str):
+    """Fetch raw GSC data - this gets cached."""
+    try:
+        gsc_client = GSCClient()
+        gsc_client.authenticate()
+        
+        # Get search analytics data
+        df = gsc_client.get_search_analytics_data(
+            start_date=start_date_str,
+            end_date=end_date_str
+        )
+        
+        return df
+        
+    except Exception as e:
+        st.error(f"Error fetching GSC data: {str(e)}")
+        return None
+
 def fetch_aeo_geo_data():
     """Fetch and analyze GSC data for AEO/GEO optimization."""
     try:
         with st.spinner("🔍 Fetching Google Search Console data..."):
-            gsc_client = GSCClient()
-            gsc_client.authenticate()
-            
-            # Fetch data from last 90 days
+            # Calculate dates
             end_date = datetime.now().date()
             start_date = end_date - timedelta(days=90)
             
-            # Get search analytics data
-            df = gsc_client.get_search_analytics_data(
-                start_date=start_date.strftime('%Y-%m-%d'),
-                end_date=end_date.strftime('%Y-%m-%d')
+            # Get cached raw data
+            df = fetch_raw_gsc_data(
+                start_date.strftime('%Y-%m-%d'),
+                end_date.strftime('%Y-%m-%d')
             )
             
             if df is None or df.empty:
@@ -161,15 +192,24 @@ def fetch_aeo_geo_data():
             # Filter for non-brand keywords
             brand_keywords = config.BRAND_KEYWORDS
             brand_pattern = '|'.join([re.escape(brand.lower()) for brand in brand_keywords])
-            df_filtered = df[~df['query'].str.lower().str.contains(brand_pattern, na=False)]
+            df_filtered = df[~df['query'].str.lower().str.contains(brand_pattern, na=False)].copy()
             
-            # Add AEO/GEO analysis columns
-            df_filtered = df_filtered.copy()  # Fix pandas warning
-            df_filtered['Intent_Type'] = df_filtered['query'].apply(classify_aeo_geo_intent)
-            df_filtered['SERP_Features'] = df_filtered['query'].apply(analyze_serp_features)
-            df_filtered['Is_Question'] = df_filtered['query'].str.lower().str.contains('how|what|why|when|where|who', na=False)
-            df_filtered['Answer_Potential'] = df_filtered.apply(calculate_answer_potential, axis=1)
-            df_filtered['Est_Search_Volume'] = df_filtered['impressions'].apply(lambda x: estimate_search_volume(x))
+            # Filter out permanently deleted keywords
+            deleted_keywords = load_deleted_keywords()
+            if deleted_keywords:
+                df_filtered = df_filtered[~df_filtered['query'].isin(deleted_keywords)].copy()
+            
+            # Add AEO/GEO analysis columns using assign to avoid pandas warnings
+            from ahrefs_data_loader import has_ahrefs_data, get_real_search_volume
+            
+            df_filtered = df_filtered.assign(
+                Intent_Type=df_filtered['query'].apply(classify_aeo_geo_intent),
+                SERP_Features=df_filtered['query'].apply(analyze_serp_features),
+                Is_Question=df_filtered['query'].str.lower().str.contains('how|what|why|when|where|who', na=False),
+                Answer_Potential=df_filtered.apply(calculate_answer_potential, axis=1),
+                Est_Search_Volume=df_filtered.apply(lambda row: get_real_search_volume(row['query'], row['impressions']), axis=1),
+                Data_Source=df_filtered['query'].apply(lambda keyword: 'Ahrefs' if has_ahrefs_data(keyword) else 'GSC Est.')
+            )
             
             return df_filtered
         
@@ -260,6 +300,13 @@ def display_analysis_table(df):
     """Display interactive analysis table with filtering."""
     st.subheader("🔍 AEO/GEO Query Analysis")
     
+    # Load permanently deleted keywords
+    deleted_keywords = load_deleted_keywords()
+    
+    # Remove deleted keywords from the dataframe (this is additional safety since they should already be filtered)
+    if deleted_keywords:
+        df = df[~df['query'].isin(deleted_keywords)].copy()
+    
     # Filters
     col1, col2, col3, col4, col5 = st.columns(5)
     
@@ -331,32 +378,146 @@ def display_analysis_table(df):
     # Sort by answer potential
     filtered_df = filtered_df.sort_values('Answer_Potential', ascending=False)
     
-    # Display results count
-    st.info(f"📊 Showing {len(filtered_df):,} queries (filtered from {len(df):,} total)")
+    # Display results count and delete controls
+    results_col, delete_col = st.columns([3, 1])
+    
+    with results_col:
+        total_deleted = len(deleted_keywords) if deleted_keywords else 0
+        st.info(f"📊 Showing {len(filtered_df):,} queries (filtered from {len(df):,} total) | 🗑️ {total_deleted} permanently deleted")
+    
+    with delete_col:
+        if st.button("🗑️ Delete Selected", help="Permanently delete selected queries from analysis"):
+            # Get selected queries from the edited data
+            if 'aeo_edited_data' in st.session_state and st.session_state.aeo_edited_data is not None:
+                # Find checked rows
+                selected_queries = []
+                for idx, row in st.session_state.aeo_edited_data.iterrows():
+                    if row.get('Delete', False):  # Check if the checkbox is checked
+                        selected_queries.append(row['Query'])
+                
+                if selected_queries:
+                    # Add selected queries to permanently deleted set
+                    deleted_keywords.update(selected_queries)
+                    save_deleted_keywords(deleted_keywords)
+                    st.success(f"Permanently deleted {len(selected_queries)} queries from analysis!")
+                    # Force refresh of the page
+                    st.rerun()
+                else:
+                    st.warning("No queries selected for deletion")
+            else:
+                st.warning("No queries selected for deletion")
+    
+    if deleted_keywords:
+        if st.button("🔄 Reset All Deleted Queries", help="Restore all permanently deleted queries"):
+            # Clear the deleted keywords file
+            save_deleted_keywords(set())
+            st.success("All permanently deleted queries restored!")
+            st.rerun()
     
     # Display table
     display_columns = [
-        'query', 'position', 'impressions', 'clicks', 'ctr', 'Est_Search_Volume',
+        'query', 'position', 'impressions', 'clicks', 'ctr', 'Est_Search_Volume', 'Data_Source',
         'Intent_Type', 'Is_Question', 'Answer_Potential', 'SERP_Features'
     ]
     
     display_df = filtered_df[display_columns].copy()
-    display_df['ctr'] = display_df['ctr'].apply(lambda x: f"{x:.1%}")
-    display_df['position'] = display_df['position'].apply(lambda x: f"{x:.1f}")
-    display_df['Answer_Potential'] = display_df['Answer_Potential'].apply(lambda x: f"{x:.0f}")
-    display_df['Est_Search_Volume'] = display_df['Est_Search_Volume'].apply(lambda x: f"{x:,}")
+    
+    # Add checkbox column for deletion
+    display_df.insert(0, 'Delete', False)
+    
+    # Convert CTR from decimal to percentage for display (GSC gives CTR as decimal like 0.085)
+    display_df['ctr'] = display_df['ctr'] * 100
+    
+    # Format numeric columns for display (keep as numeric for sorting)
+    display_df['Answer_Potential'] = display_df['Answer_Potential'].round(0).astype(int)
     
     # Rename columns for display
     display_df.columns = [
-        'Query', 'Position', 'Impressions', 'Clicks', 'CTR', 'Est. Search Volume',
+        'Delete', 'Query', 'Position', 'Impressions', 'Clicks', 'CTR', 'Est. Search Volume', 'Data Source',
         'Intent Type', 'Question?', 'Answer Potential', 'SERP Features'
     ]
     
-    st.dataframe(
+    # Column configuration for the data editor
+    column_config = {
+        "Delete": st.column_config.CheckboxColumn(
+            "Select",
+            help="Check to select query for deletion",
+            default=False,
+            width="small"
+        ),
+        "Query": st.column_config.TextColumn(
+            "Query",
+            width="large"
+        ),
+        "Position": st.column_config.NumberColumn(
+            "Position",
+            format="%.1f",
+            width="small"
+        ),
+        "Impressions": st.column_config.NumberColumn(
+            "Impressions",
+            format="%d",
+            width="small"
+        ),
+        "Clicks": st.column_config.NumberColumn(
+            "Clicks", 
+            format="%d",
+            width="small"
+        ),
+        "CTR": st.column_config.NumberColumn(
+            "CTR",
+            format="%.1f%%",
+            width="small"
+        ),
+        "Est. Search Volume": st.column_config.NumberColumn(
+            "Est. Volume",
+            help="Monthly search volume (Ahrefs when available, estimated otherwise)",
+            format="%d",
+            width="small"
+        ),
+        "Data Source": st.column_config.TextColumn(
+            "Source",
+            help="Data source: Ahrefs (real data) or GSC Est. (estimated)",
+            width="small"
+        ),
+        "Intent Type": st.column_config.TextColumn(
+            "Intent",
+            width="medium"
+        ),
+        "Question?": st.column_config.CheckboxColumn(
+            "Q?",
+            width="small"
+        ),
+        "Answer Potential": st.column_config.NumberColumn(
+            "Answer Potential",
+            format="%d",
+            width="small"
+        ),
+        "SERP Features": st.column_config.TextColumn(
+            "SERP Features",
+            width="medium"
+        )
+    }
+    
+    # Display the interactive data editor
+    edited_df = st.data_editor(
         display_df,
         use_container_width=True,
-        hide_index=True
+        height=600,
+        column_config=column_config,
+        disabled=list(display_df.columns[1:]),  # Disable editing of all columns except Delete
+        hide_index=True,
+        key="aeo_data_editor"
     )
+    
+    # Store edited data in session state for deletion processing
+    st.session_state.aeo_edited_data = edited_df
+    
+    # Show selected count
+    if edited_df is not None:
+        selected_count = edited_df['Delete'].sum()
+        if selected_count > 0:
+            st.info(f"🗑️ {selected_count} queries selected for deletion")
     
     return filtered_df
 
@@ -500,19 +661,57 @@ def display_glossary():
 
 def main():
     """Main dashboard function."""
+    # Navigation
+    st.sidebar.markdown("## 🧭 Navigation")
+    st.sidebar.markdown("**Current:** 🤖 AEO/GEO Dashboard")
+    st.sidebar.markdown("""
+    <a href="http://localhost:8504" target="_blank" style="
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 0.3rem;
+        font-weight: bold;
+        margin: 0.5rem 0;
+    ">🎯 Open SEO Dashboard</a>
+    """, unsafe_allow_html=True)
+    
+    st.sidebar.markdown("---")
+    
     # Header
     st.title("🤖 AEO/GEO Analysis Dashboard")
     st.markdown("### Answer Engine & Generative Engine Optimization for synthesis.com/tutor")
     
-    # Load data
-    df = fetch_aeo_geo_data()
+    # Initialize session state for data caching
+    if 'aeo_data_loaded' not in st.session_state:
+        st.session_state.aeo_data_loaded = False
+        st.session_state.aeo_data = None
+    
+    # Load data only once or when explicitly refreshed
+    if not st.session_state.aeo_data_loaded or st.session_state.aeo_data is None:
+        df = fetch_aeo_geo_data()
+        if df is not None and len(df) > 0:
+            st.session_state.aeo_data = df
+            st.session_state.aeo_data_loaded = True
+    else:
+        df = st.session_state.aeo_data
     
     if df is None or len(df) == 0:
         st.error("Unable to fetch data from Google Search Console. Please check your connection and authentication.")
         return
     
-    st.success(f"✅ Loaded {len(df):,} non-brand queries for AEO/GEO analysis")
-    
+    # Add refresh button and data info
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.success(f"✅ Loaded {len(df):,} non-brand queries for AEO/GEO analysis")
+    with col2:
+        if st.button("🔄 Refresh Data", help="Reload data from Google Search Console"):
+            st.session_state.aeo_data_loaded = False
+            st.session_state.aeo_data = None
+            st.cache_data.clear()  # Clear Streamlit cache
+            st.rerun()
+
     # Summary metrics
     create_summary_metrics(df)
     

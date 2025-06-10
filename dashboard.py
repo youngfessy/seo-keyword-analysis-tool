@@ -181,9 +181,19 @@ def load_latest_data():
     if 'Search Intent' not in df.columns:
         df['Search Intent'] = df['Keyword'].apply(classify_search_intent)
     
-    # Estimate monthly search volume based on impressions (rough estimate)
+    # Add real search volume from Ahrefs with fallback to estimates
     if 'Est. Monthly Volume' not in df.columns:
-        df['Est. Monthly Volume'] = (df['Monthly Impressions'] / 0.1).round().astype(int)
+        from ahrefs_data_loader import get_real_search_volume, has_ahrefs_data
+        
+        df['Est. Monthly Volume'] = df.apply(
+            lambda row: get_real_search_volume(row['Keyword'], row['Monthly Impressions']), 
+            axis=1
+        )
+        
+        # Add data source indicator
+        df['Data Source'] = df['Keyword'].apply(
+            lambda keyword: 'Ahrefs' if has_ahrefs_data(keyword) else 'GSC Est.'
+        )
     
     return df, latest_file
 
@@ -460,6 +470,10 @@ def display_paginated_table(df, filename):
     # Prepare the display dataframe for proper sorting
     display_df = page_df.copy()
     
+    # Convert CTR values from decimals to percentages for display
+    display_df['Current CTR'] = display_df['Current CTR'] * 100
+    display_df['CTR Potential'] = display_df['CTR Potential'] * 100
+    
     # Add interactive checkbox column for deletion
     display_df.insert(0, 'Delete', False)  # Add boolean column for checkboxes
     
@@ -470,7 +484,7 @@ def display_paginated_table(df, filename):
     column_order = [
         'Delete', 'Keyword', 'Current Position', 'Opportunity Score', 'Priority', 'Opportunity Type',
         'Monthly Impressions', 'Monthly Clicks', 'Current CTR', 'CTR Potential', 'Traffic Potential',
-        'Est. Monthly Volume', 'Keyword Difficulty', 'Average CPC', 'Search Intent'
+        'Est. Monthly Volume', 'Data Source', 'Keyword Difficulty', 'Average CPC', 'Search Intent'
     ]
     display_df = display_df[column_order]
     
@@ -522,13 +536,13 @@ def display_paginated_table(df, filename):
         "Current CTR": st.column_config.NumberColumn(
             "CTR",
             help="Current click-through rate",
-            format="%.4f",
+            format="%.1f%%",
             width="small"
         ),
         "CTR Potential": st.column_config.NumberColumn(
             "CTR Pot.",
             help="CTR improvement potential", 
-            format="%.4f",
+            format="%.1f%%",
             width="small"
         ),
         "Traffic Potential": st.column_config.NumberColumn(
@@ -539,8 +553,13 @@ def display_paginated_table(df, filename):
         ),
         "Est. Monthly Volume": st.column_config.NumberColumn(
             "Volume",
-            help="Estimated monthly search volume",
+            help="Monthly search volume (Ahrefs when available, estimated otherwise)",
             format="%d",
+            width="small"
+        ),
+        "Data Source": st.column_config.TextColumn(
+            "Source",
+            help="Data source: Ahrefs (real data) or GSC Est. (estimated)",
             width="small"
         ),
         "Keyword Difficulty": st.column_config.NumberColumn(
@@ -610,6 +629,24 @@ def export_filtered_data(df):
 
 def main():
     """Main dashboard function."""
+    # Navigation
+    st.sidebar.markdown("## 🧭 Navigation")
+    st.sidebar.markdown("**Current:** 🎯 SEO Dashboard")
+    st.sidebar.markdown("""
+    <a href="http://localhost:8505" target="_blank" style="
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        background-color: #FF6B6B;
+        color: white;
+        text-decoration: none;
+        border-radius: 0.3rem;
+        font-weight: bold;
+        margin: 0.5rem 0;
+    ">🤖 Open AEO/GEO Dashboard</a>
+    """, unsafe_allow_html=True)
+    
+    st.sidebar.markdown("---")
+    
     # Header
     st.title("🎯 SEO Keyword Opportunities Dashboard")
     st.markdown("### synthesis.com/tutor - Keyword Analysis")
@@ -721,13 +758,13 @@ def display_glossary():
     # Opportunity Types
     st.subheader("Opportunity Types")
     st.markdown("""
-    **CTR Optimization**: Keywords where you rank well but have low click-through rates. Focus on improving titles and meta descriptions.
+    **CTR Optimization**: Keywords where you rank in top 3 but have low click-through rates. Focus on improving titles and meta descriptions.
+    
+    **Top 3 Push**: Keywords ranking 4-10 that could realistically be pushed into the top 3 with optimization effort.
     
     **Top 10 Push**: Keywords ranking 11-20 that could realistically be pushed into the top 10 with some effort.
     
-    **First Page Push**: Keywords ranking 21-50 that could potentially reach the first page (positions 1-10).
-    
-    **Content Optimization**: Keywords with moderate ranking and traffic potential that would benefit from content improvements.
+    **First Page Push**: Keywords ranking 21+ that could potentially reach the first page (positions 1-20).
     
     **Long-term Target**: Lower priority keywords that require significant effort but may pay off over time.
     """)
@@ -760,11 +797,13 @@ def display_glossary():
     The Opportunity Score is calculated using four weighted factors:
     
     - **Position Score (40%)**: Higher ranking positions receive higher scores
-    - **Volume Score (30%)**: Keywords with more monthly impressions get higher scores
-    - **Traffic Score (20%)**: Potential for improved CTR based on an improvement in positioning by 1 position
-    - **CTR Gap Score (10%)**: Larger gaps between current and expected CTR increase the score
+    - **Volume Score (30%)**: Real search volume from Ahrefs (when available) or estimated from impressions
+    - **Difficulty Score (20%)**: Lower keyword difficulty scores get higher opportunity scores
+    - **Traffic Score (10%)**: Expected jump in CTR for 1 position improvement
     
-    This creates a balanced score that prioritizes keywords with the best combination of existing visibility, traffic potential, and optimization opportunity.
+    **Data Sources**: We prioritize real Ahrefs data (marked as "Ahrefs") when available, falling back to GSC estimates (marked as "GSC Est.") for comprehensive coverage.
+    
+    This creates a balanced score that prioritizes keywords with the best combination of existing visibility, real search volume, feasibility, and optimization opportunity.
     """)
     
     # CTR Benchmarks

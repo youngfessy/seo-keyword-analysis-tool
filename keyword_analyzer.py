@@ -52,31 +52,35 @@ class KeywordOpportunity:
         return int(self.impressions * self.ctr_potential)
     
     def _calculate_opportunity_score(self) -> float:
-        """Calculate overall opportunity score (0-100)."""
+        """Calculate overall opportunity score (0-100) with Ahrefs data integration."""
+        from ahrefs_data_loader import get_real_search_volume, get_keyword_difficulty, has_ahrefs_data
+        
         # Position score (closer to top = higher score) - 40%
         position_score = max(0, (101 - self.average_position) / 100) * 40
         
-        # Volume score (keywords with more impressions get higher scores) - 30%
-        volume_score = min(np.log10(max(1, self.impressions)) / 4, 1) * 30
+        # Volume score (real search volume from Ahrefs when available) - 30%
+        real_volume = get_real_search_volume(self.keyword, self.impressions)
+        volume_score = min(np.log10(max(1, real_volume)) / 5.5, 1) * 30  # Adjusted scale for higher volumes
         
-        # Traffic score (potential CTR improvement for 1 position jump) - 20%
-        traffic_score = min(self.traffic_potential / 100, 1) * 20
+        # Difficulty score (lower difficulty = higher score) - 20%
+        keyword_difficulty = get_keyword_difficulty(self.keyword)
+        difficulty_score = max(0, (100 - keyword_difficulty) / 100) * 20
         
-        # CTR gap score (larger gaps between current and expected CTR) - 10%
-        ctr_gap_score = min(self.ctr_potential * 100, 1) * 10
+        # Traffic score (expected jump in CTR for 1 position improvement) - 10%
+        traffic_score = min(self.traffic_potential / 100, 1) * 10
         
-        return min(100, position_score + volume_score + traffic_score + ctr_gap_score)
+        return min(100, position_score + volume_score + difficulty_score + traffic_score)
     
     def _determine_opportunity_type(self) -> str:
         """Determine the type of opportunity."""
         if self.average_position <= 3 and self.ctr < 0.15:
             return "CTR Optimization"
         elif 4 <= self.average_position <= 10 and self.impressions >= 100:
-            return "Top 10 Push"
+            return "Top 3 Push"  # Already in top 10, push to top 3
         elif 11 <= self.average_position <= 20 and self.impressions >= 50:
-            return "First Page Push"
-        elif 21 <= self.average_position <= 50:
-            return "Content Optimization"
+            return "Top 10 Push"  # Push from 11-20 into top 10
+        elif 21 <= self.average_position <= 30 and self.impressions >= 25:
+            return "First Page Push"  # Push to first page (top 20)
         else:
             return "Long-term Target"
     
@@ -178,9 +182,9 @@ class GSCKeywordAnalyzer:
             'Medium Priority': [],
             'Low Priority': [],
             'CTR Optimization': [],
+            'Top 3 Push': [],
             'Top 10 Push': [],
             'First Page Push': [],
-            'Content Optimization': [],
             'Long-term Target': []
         }
         
@@ -199,9 +203,18 @@ class GSCKeywordAnalyzer:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"keyword_opportunities_{timestamp}.csv"
         
+        # Load Ahrefs data for enrichment
+        from ahrefs_data_loader import get_ahrefs_loader, get_real_search_volume, has_ahrefs_data
+        ahrefs_loader = get_ahrefs_loader()
+        
         # Create export data
         export_data = []
         for opp in opportunities:
+            # Get Ahrefs data
+            ahrefs_data = ahrefs_loader.get_keyword_data(opp.keyword)
+            real_volume = get_real_search_volume(opp.keyword, opp.impressions)
+            data_source = 'Ahrefs' if has_ahrefs_data(opp.keyword) else 'GSC Est.'
+            
             export_data.append({
                 'Keyword': opp.keyword,
                 'Current Position': round(opp.average_position, 1),
@@ -212,7 +225,12 @@ class GSCKeywordAnalyzer:
                 'Traffic Potential': opp.traffic_potential,
                 'Opportunity Score': round(opp.opportunity_score, 1),
                 'Opportunity Type': opp.opportunity_type,
-                'Priority': opp.priority
+                'Priority': opp.priority,
+                'Est. Monthly Volume': real_volume,
+                'Keyword Difficulty': ahrefs_data.get('difficulty', 50),
+                'Average CPC': ahrefs_data.get('cpc', 0.0),
+                'Search Intent': self._classify_search_intent(opp.keyword),
+                'Data Source': data_source
             })
         
         df_export = pd.DataFrame(export_data)
@@ -220,6 +238,28 @@ class GSCKeywordAnalyzer:
         
         print(f"📁 Exported {len(opportunities)} opportunities to {filename}")
         return filename
+    
+    def _classify_search_intent(self, keyword: str) -> str:
+        """Classify search intent for a keyword."""
+        keyword_lower = keyword.lower()
+        
+        # Commercial intent indicators
+        commercial_indicators = ['buy', 'purchase', 'price', 'cost', 'cheap', 'discount', 'deal', 'sale', 'review', 'compare', 'vs', 'versus', 'best', 'top', 'alternative']
+        
+        # Informational intent indicators  
+        informational_indicators = ['how', 'what', 'why', 'when', 'where', 'who', 'guide', 'tutorial', 'learn', 'definition', 'meaning', 'explained']
+        
+        # Navigational intent indicators
+        navigational_indicators = ['login', 'sign in', 'account', 'dashboard', 'portal', 'app', 'download']
+        
+        if any(indicator in keyword_lower for indicator in commercial_indicators):
+            return 'Commercial'
+        elif any(indicator in keyword_lower for indicator in navigational_indicators):
+            return 'Navigational'
+        elif any(indicator in keyword_lower for indicator in informational_indicators):
+            return 'Informational'
+        else:
+            return 'Informational'  # Default to informational
     
     def print_summary(self, opportunities: List[KeywordOpportunity]):
         """Print analysis summary."""
@@ -244,7 +284,7 @@ class GSCKeywordAnalyzer:
         
         # Opportunity type breakdown
         print(f"\n🎯 OPPORTUNITY TYPES:")
-        for opp_type in ['CTR Optimization', 'Top 10 Push', 'First Page Push', 'Content Optimization', 'Long-term Target']:
+        for opp_type in ['CTR Optimization', 'Top 3 Push', 'Top 10 Push', 'First Page Push', 'Long-term Target']:
             count = len(categories[opp_type])
             if count > 0:
                 print(f"   {opp_type}: {count} keywords")
