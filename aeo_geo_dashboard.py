@@ -16,13 +16,7 @@ import plotly.graph_objects as go
 import re
 import os
 
-# Page configuration
-st.set_page_config(
-    page_title="AEO/GEO Analysis Dashboard",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# Page configuration will be handled by main app
 
 # Import existing modules
 try:
@@ -659,25 +653,44 @@ def display_glossary():
         - Build authoritative, citable content sources
         """)
 
+def add_navigation():
+    """Add smart navigation that works both locally and in cloud deployment."""
+    import os
+    
+    # Detect environment
+    is_cloud = os.getenv('STREAMLIT_CLOUD', False) or 'streamlit.app' in os.getenv('STREAMLIT_SERVER_ADDRESS', '')
+    
+    st.sidebar.markdown("## 🧭 Dashboard Navigation")
+    st.sidebar.markdown("**Current:** 🤖 AEO/GEO Analysis")
+    
+    if is_cloud:
+        # For cloud deployment, provide instructions
+        st.sidebar.markdown("### 🎯 SEO Dashboard")
+        st.sidebar.info("Deploy the `dashboard.py` as a separate Streamlit app for SEO keyword analysis")
+    else:
+        # For local development, provide working links
+        st.sidebar.markdown("""
+        <a href="http://localhost:8504" target="_blank" style="
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 0.3rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+            text-align: center;
+            width: 200px;
+        ">🎯 Open SEO Dashboard</a>
+        """, unsafe_allow_html=True)
+        st.sidebar.caption("💡 Run: `streamlit run dashboard.py --server.port 8504`")
+    
+    st.sidebar.markdown("---")
+
 def main():
     """Main dashboard function."""
     # Navigation
-    st.sidebar.markdown("## 🧭 Navigation")
-    st.sidebar.markdown("**Current:** 🤖 AEO/GEO Dashboard")
-    st.sidebar.markdown("""
-    <a href="http://localhost:8504" target="_blank" style="
-        display: inline-block;
-        padding: 0.5rem 1rem;
-        background-color: #4CAF50;
-        color: white;
-        text-decoration: none;
-        border-radius: 0.3rem;
-        font-weight: bold;
-        margin: 0.5rem 0;
-    ">🎯 Open SEO Dashboard</a>
-    """, unsafe_allow_html=True)
-    
-    st.sidebar.markdown("---")
+    add_navigation()
     
     # Header
     st.title("🤖 AEO/GEO Analysis Dashboard")
