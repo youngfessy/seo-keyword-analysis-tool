@@ -166,46 +166,46 @@ def fetch_raw_gsc_data(start_date_str, end_date_str):
         st.error(f"Error fetching GSC data: {str(e)}")
         return None
 
+@st.cache_data(ttl=1800)  # Cache for 30 minutes  
 def fetch_aeo_geo_data():
     """Fetch and analyze GSC data for AEO/GEO optimization."""
     try:
-        with st.spinner("🔍 Fetching Google Search Console data..."):
-            # Calculate dates
-            end_date = datetime.now().date()
-            start_date = end_date - timedelta(days=90)
-            
-            # Get cached raw data
-            df = fetch_raw_gsc_data(
-                start_date.strftime('%Y-%m-%d'),
-                end_date.strftime('%Y-%m-%d')
-            )
-            
-            if df is None or df.empty:
-                return None
-            
-            # Filter for non-brand keywords
-            brand_keywords = config.BRAND_KEYWORDS
-            brand_pattern = '|'.join([re.escape(brand.lower()) for brand in brand_keywords])
-            df_filtered = df[~df['query'].str.lower().str.contains(brand_pattern, na=False)].copy()
-            
-            # Filter out permanently deleted keywords
-            deleted_keywords = load_deleted_keywords()
-            if deleted_keywords:
-                df_filtered = df_filtered[~df_filtered['query'].isin(deleted_keywords)].copy()
-            
-            # Add AEO/GEO analysis columns using assign to avoid pandas warnings
-            from ahrefs_data_loader import has_ahrefs_data, get_real_search_volume
-            
-            df_filtered = df_filtered.assign(
-                Intent_Type=df_filtered['query'].apply(classify_aeo_geo_intent),
-                SERP_Features=df_filtered['query'].apply(analyze_serp_features),
-                Is_Question=df_filtered['query'].str.lower().str.contains('how|what|why|when|where|who', na=False),
-                Answer_Potential=df_filtered.apply(calculate_answer_potential, axis=1),
-                Est_Search_Volume=df_filtered.apply(lambda row: get_real_search_volume(row['query'], row['impressions']), axis=1),
-                Data_Source=df_filtered['query'].apply(lambda keyword: 'Ahrefs' if has_ahrefs_data(keyword) else 'GSC Est.')
-            )
-            
-            return df_filtered
+        # Calculate dates
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=90)
+        
+        # Get cached raw data
+        df = fetch_raw_gsc_data(
+            start_date.strftime('%Y-%m-%d'),
+            end_date.strftime('%Y-%m-%d')
+        )
+        
+        if df is None or df.empty:
+            return None
+        
+        # Filter for non-brand keywords
+        brand_keywords = config.BRAND_KEYWORDS
+        brand_pattern = '|'.join([re.escape(brand.lower()) for brand in brand_keywords])
+        df_filtered = df[~df['query'].str.lower().str.contains(brand_pattern, na=False)].copy()
+        
+        # Filter out permanently deleted keywords
+        deleted_keywords = load_deleted_keywords()
+        if deleted_keywords:
+            df_filtered = df_filtered[~df_filtered['query'].isin(deleted_keywords)].copy()
+        
+        # Add AEO/GEO analysis columns using assign to avoid pandas warnings
+        from ahrefs_data_loader import has_ahrefs_data, get_real_search_volume
+        
+        df_filtered = df_filtered.assign(
+            Intent_Type=df_filtered['query'].apply(classify_aeo_geo_intent),
+            SERP_Features=df_filtered['query'].apply(analyze_serp_features),
+            Is_Question=df_filtered['query'].str.lower().str.contains('how|what|why|when|where|who', na=False),
+            Answer_Potential=df_filtered.apply(calculate_answer_potential, axis=1),
+            Est_Search_Volume=df_filtered.apply(lambda row: get_real_search_volume(row['query'], row['impressions']), axis=1),
+            Data_Source=df_filtered['query'].apply(lambda keyword: 'Ahrefs' if has_ahrefs_data(keyword) else 'GSC Est.')
+        )
+        
+        return df_filtered
         
     except Exception as e:
         st.error(f"Error fetching AEO/GEO data: {str(e)}")
@@ -689,9 +689,6 @@ def add_navigation():
 
 def main():
     """Main dashboard function."""
-    # Navigation
-    add_navigation()
-    
     # Header
     st.title("🤖 AEO/GEO Analysis Dashboard")
     st.markdown("### Answer Engine & Generative Engine Optimization for synthesis.com/tutor")
@@ -703,10 +700,13 @@ def main():
     
     # Load data only once or when explicitly refreshed
     if not st.session_state.aeo_data_loaded or st.session_state.aeo_data is None:
-        df = fetch_aeo_geo_data()
-        if df is not None and len(df) > 0:
-            st.session_state.aeo_data = df
-            st.session_state.aeo_data_loaded = True
+        with st.spinner("🔍 Fetching and processing Google Search Console data..."):
+            df = fetch_aeo_geo_data()
+            if df is not None and len(df) > 0:
+                st.session_state.aeo_data = df
+                st.session_state.aeo_data_loaded = True
+            else:
+                st.session_state.aeo_data = None
     else:
         df = st.session_state.aeo_data
     
