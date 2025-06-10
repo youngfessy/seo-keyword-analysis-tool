@@ -8,6 +8,82 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Custom CSS for unified app styling
+st.markdown("""
+<style>
+    /* Dark mode table styling */
+    .stDataFrame > div {
+        background-color: #1e1e1e !important;
+        color: #ffffff !important;
+    }
+    
+    .stDataFrame table {
+        background-color: #1e1e1e !important;
+        color: #ffffff !important;
+    }
+    
+    .stDataFrame th {
+        background-color: #2d2d2d !important;
+        color: #ffffff !important;
+        border: 1px solid #404040 !important;
+    }
+    
+    .stDataFrame td {
+        background-color: #1e1e1e !important;
+        color: #ffffff !important;
+        border: 1px solid #404040 !important;
+    }
+    
+    /* High priority rows */
+    .priority-high {
+        background-color: #4a1a1a !important;
+        color: #ffffff !important;
+    }
+    
+    /* Medium priority rows */
+    .priority-medium {
+        background-color: #4a3a1a !important;
+        color: #ffffff !important;
+    }
+    
+    /* Low priority rows */
+    .priority-low {
+        background-color: #1a4a1a !important;
+        color: #ffffff !important;
+    }
+    
+    /* AEO/GEO specific styling */
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 4px solid #4CAF50;
+    }
+    
+    .stDataFrame {
+        border-radius: 0.5rem;
+    }
+    
+    .stTab {
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    
+    /* Main content area */
+    .main .block-container {
+        padding-top: 2rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: none;
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        padding-top: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 import sys
 import os
 
