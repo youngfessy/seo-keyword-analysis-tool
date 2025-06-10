@@ -5,11 +5,6 @@ token.pickle
 *.env
 .env
 
-# Data files (contain private search console data)
-keyword_opportunities_*.csv
-ahrefs_keyword_data/
-deleted_aeo_keywords.txt
-
 # Python
 __pycache__/
 *.py[cod]
@@ -67,12 +62,6 @@ Thumbs.db
 
 # Logs
 *.log
-
-# Output files
-*.xlsx
-*.csv
-output/
-reports/
 
 # OS
 .env.local
