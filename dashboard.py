@@ -158,7 +158,7 @@ def load_deleted_keywords():
             return set(line.strip() for line in f if line.strip())
     return set()
 
-@st.cache_data(ttl=1800)  # Cache for 30 minutes
+@st.cache_data(ttl=1800, show_spinner="🔄 Loading keyword data...")  # Cache for 30 minutes
 def load_latest_data():
     """Load keyword opportunities data from live GSC data."""
     # Prioritize live GSC data for real-time analysis

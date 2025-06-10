@@ -139,8 +139,14 @@ def seo_dashboard():
     st.title("🎯 SEO Keyword Opportunities Dashboard")
     st.markdown("### synthesis.com/tutor - Keyword Analysis")
     
-    # Load data
-    df, filename = load_latest_data()
+    # Load data with error handling
+    with st.spinner("🔄 Loading SEO data..."):
+        try:
+            df, filename = load_latest_data()
+        except Exception as e:
+            st.error(f"❌ Error loading data: {str(e)}")
+            st.info("💡 This might be due to Google Search Console authentication issues. Please check your secrets configuration.")
+            return
     
     if df is None:
         st.error("No keyword opportunities data found. Please run the keyword analyzer first.")
@@ -218,10 +224,16 @@ def aeo_dashboard():
     
     # Load data only once or when explicitly refreshed
     if not st.session_state.aeo_data_loaded or st.session_state.aeo_data is None:
-        df = get_aeo_data_from_session()
-        if df is not None and len(df) > 0:
-            st.session_state.aeo_data = df
-            st.session_state.aeo_data_loaded = True
+        with st.spinner("🔄 Loading AEO/GEO data..."):
+            try:
+                df = get_aeo_data_from_session()
+                if df is not None and len(df) > 0:
+                    st.session_state.aeo_data = df
+                    st.session_state.aeo_data_loaded = True
+            except Exception as e:
+                st.error(f"❌ Error loading AEO/GEO data: {str(e)}")
+                st.info("💡 This might be due to Google Search Console authentication issues. Please check your secrets configuration.")
+                return
     else:
         df = st.session_state.aeo_data
     
