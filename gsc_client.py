@@ -12,6 +12,13 @@ from google.auth.transport.requests import Request
 import pandas as pd
 import config
 
+# Streamlit imports for cloud deployment
+try:
+    import streamlit as st
+    STREAMLIT_AVAILABLE = True
+except ImportError:
+    STREAMLIT_AVAILABLE = False
+
 class GSCClient:
     """Google Search Console API client."""
     
@@ -35,12 +42,21 @@ class GSCClient:
                 self.credentials.refresh(Request())
             else:
                 print("  🆕 Getting new credentials...")
+                
+                # Get credentials - either from Streamlit secrets or config
+                if STREAMLIT_AVAILABLE and hasattr(st, 'secrets'):
+                    client_id = st.secrets["google"]["client_id"]
+                    client_secret = st.secrets["google"]["client_secret"]
+                else:
+                    client_id = config.GOOGLE_CLIENT_ID
+                    client_secret = config.GOOGLE_CLIENT_SECRET
+                
                 # Create OAuth flow
                 flow = Flow.from_client_config(
                     {
                         "web": {
-                            "client_id": config.GOOGLE_CLIENT_ID,
-                            "client_secret": config.GOOGLE_CLIENT_SECRET,
+                            "client_id": client_id,
+                            "client_secret": client_secret,
                             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                             "token_uri": "https://oauth2.googleapis.com/token",
                             "redirect_uris": ["http://localhost:8080"]
