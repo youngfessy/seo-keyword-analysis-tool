@@ -158,10 +158,19 @@ def load_deleted_keywords():
             return set(line.strip() for line in f if line.strip())
     return set()
 
-@st.cache_data(ttl=3600)  # Cache for 1 hour
+@st.cache_data(ttl=1800)  # Cache for 30 minutes
 def load_latest_data():
-    """Load keyword opportunities data - either from CSV files or generate from GSC data."""
-    # First try to find CSV files (for local development)
+    """Load keyword opportunities data from live GSC data."""
+    # Prioritize live GSC data for real-time analysis
+    data = generate_opportunities_from_gsc()
+    if data is not None:
+        # Filter out permanently deleted keywords from live data
+        deleted_keywords = load_deleted_keywords()
+        if deleted_keywords:
+            data = data[~data['Keyword'].isin(deleted_keywords)].copy()
+        return data, "live_gsc_data"
+    
+    # Fallback to CSV files only if GSC fails
     csv_files = glob.glob("keyword_opportunities_*.csv")
     if csv_files:
         latest_file = max(csv_files, key=os.path.getctime)
@@ -177,15 +186,8 @@ def load_latest_data():
             df = df[~df['Keyword'].isin(deleted_keywords)].copy()
         
         return enhance_data_with_ahrefs(df), latest_file
-    else:
-        # Generate data from GSC (for cloud deployment)
-        data = generate_opportunities_from_gsc()
-        if data is not None:
-            # Filter out permanently deleted keywords from live data too
-            deleted_keywords = load_deleted_keywords()
-            if deleted_keywords:
-                data = data[~data['Keyword'].isin(deleted_keywords)].copy()
-        return data, "live_data"
+    
+    return None, None
 
 def enhance_data_with_ahrefs(df):
     """Enhance dataframe with Ahrefs data and additional columns."""
@@ -837,9 +839,6 @@ def add_navigation():
 
 def main():
     """Main dashboard function."""
-    # Navigation
-    add_navigation()
-    
     # Header
     st.title("🎯 SEO Keyword Opportunities Dashboard")
     st.markdown("### synthesis.com/tutor - Keyword Analysis")

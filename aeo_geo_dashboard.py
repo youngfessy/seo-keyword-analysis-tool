@@ -167,18 +167,11 @@ def fetch_raw_gsc_data(start_date_str, end_date_str):
         return None
 
 @st.cache_data(ttl=1800)  # Cache for 30 minutes  
-def fetch_aeo_geo_data():
+def fetch_aeo_geo_data(start_date_str, end_date_str):
     """Fetch and analyze GSC data for AEO/GEO optimization."""
     try:
-        # Calculate dates
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=90)
-        
         # Get cached raw data
-        df = fetch_raw_gsc_data(
-            start_date.strftime('%Y-%m-%d'),
-            end_date.strftime('%Y-%m-%d')
-        )
+        df = fetch_raw_gsc_data(start_date_str, end_date_str)
         
         if df is None or df.empty:
             return None
@@ -208,8 +201,35 @@ def fetch_aeo_geo_data():
         return df_filtered
         
     except Exception as e:
-        st.error(f"Error fetching AEO/GEO data: {str(e)}")
+        st.error(f"Error processing AEO/GEO data: {str(e)}")
         return None
+
+def get_aeo_data_from_session():
+    """Get AEO data from session state with proper caching."""
+    # Check if we have valid cached data
+    if 'aeo_data_cache' in st.session_state and 'aeo_cache_time' in st.session_state:
+        # Check if cache is still valid (30 minutes)
+        cache_age = datetime.now() - st.session_state.aeo_cache_time
+        if cache_age.total_seconds() < 1800:  # 30 minutes
+            return st.session_state.aeo_data_cache
+    
+    # Cache is invalid or doesn't exist, fetch new data
+    with st.spinner("🔍 Fetching and processing Google Search Console data..."):
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=90)
+        
+        df = fetch_aeo_geo_data(
+            start_date.strftime('%Y-%m-%d'),
+            end_date.strftime('%Y-%m-%d')
+        )
+        
+        if df is not None and len(df) > 0:
+            # Cache the data with timestamp
+            st.session_state.aeo_data_cache = df
+            st.session_state.aeo_cache_time = datetime.now()
+            return df
+        else:
+            return None
 
 def create_summary_metrics(df):
     """Create summary metrics for AEO/GEO analysis."""
@@ -693,22 +713,8 @@ def main():
     st.title("🤖 AEO/GEO Analysis Dashboard")
     st.markdown("### Answer Engine & Generative Engine Optimization for synthesis.com/tutor")
     
-    # Initialize session state for data caching
-    if 'aeo_data_loaded' not in st.session_state:
-        st.session_state.aeo_data_loaded = False
-        st.session_state.aeo_data = None
-    
-    # Load data only once or when explicitly refreshed
-    if not st.session_state.aeo_data_loaded or st.session_state.aeo_data is None:
-        with st.spinner("🔍 Fetching and processing Google Search Console data..."):
-            df = fetch_aeo_geo_data()
-            if df is not None and len(df) > 0:
-                st.session_state.aeo_data = df
-                st.session_state.aeo_data_loaded = True
-            else:
-                st.session_state.aeo_data = None
-    else:
-        df = st.session_state.aeo_data
+    # Get data using improved caching
+    df = get_aeo_data_from_session()
     
     if df is None or len(df) == 0:
         st.error("Unable to fetch data from Google Search Console. Please check your connection and authentication.")
@@ -718,10 +724,17 @@ def main():
     col1, col2 = st.columns([3, 1])
     with col1:
         st.success(f"✅ Loaded {len(df):,} non-brand queries for AEO/GEO analysis")
+        # Show cache timestamp if available
+        if 'aeo_cache_time' in st.session_state:
+            cache_time = st.session_state.aeo_cache_time.strftime("%Y-%m-%d %H:%M:%S")
+            st.caption(f"📊 Data cached at: {cache_time}")
     with col2:
         if st.button("🔄 Refresh Data", help="Reload data from Google Search Console"):
-            st.session_state.aeo_data_loaded = False
-            st.session_state.aeo_data = None
+            # Clear all cache
+            if 'aeo_data_cache' in st.session_state:
+                del st.session_state.aeo_data_cache
+            if 'aeo_cache_time' in st.session_state:
+                del st.session_state.aeo_cache_time
             st.cache_data.clear()  # Clear Streamlit cache
             st.rerun()
 
