@@ -18,53 +18,54 @@ import re
 
 # Page configuration will be handled by main app
 
-# Custom CSS for dark mode table and improved styling
-st.markdown("""
-<style>
-    /* Dark mode table styling */
-    .stDataFrame > div {
-        background-color: #1e1e1e !important;
-        color: #ffffff !important;
-    }
-    
-    .stDataFrame table {
-        background-color: #1e1e1e !important;
-        color: #ffffff !important;
-    }
-    
-    .stDataFrame th {
-        background-color: #2d2d2d !important;
-        color: #ffffff !important;
-        border: 1px solid #404040 !important;
-    }
-    
-    .stDataFrame td {
-        background-color: #1e1e1e !important;
-        color: #ffffff !important;
-        border: 1px solid #404040 !important;
-    }
-    
-    /* High priority rows */
-    .priority-high {
-        background-color: #4a1a1a !important;
-        color: #ffffff !important;
-    }
-    
-    /* Medium priority rows */
-    .priority-medium {
-        background-color: #4a3a1a !important;
-        color: #ffffff !important;
-    }
-    
-    /* Low priority rows */
-    .priority-low {
-        background-color: #1a4a1a !important;
-        color: #ffffff !important;
-    }
-    
+def apply_dashboard_styling():
+    """Apply custom CSS for dark mode table and improved styling."""
+    st.markdown("""
+    <style>
+        /* Dark mode table styling */
+        .stDataFrame > div {
+            background-color: #1e1e1e !important;
+            color: #ffffff !important;
+        }
+        
+        .stDataFrame table {
+            background-color: #1e1e1e !important;
+            color: #ffffff !important;
+        }
+        
+        .stDataFrame th {
+            background-color: #2d2d2d !important;
+            color: #ffffff !important;
+            border: 1px solid #404040 !important;
+        }
+        
+        .stDataFrame td {
+            background-color: #1e1e1e !important;
+            color: #ffffff !important;
+            border: 1px solid #404040 !important;
+        }
+        
+        /* High priority rows */
+        .priority-high {
+            background-color: #4a1a1a !important;
+            color: #ffffff !important;
+        }
+        
+        /* Medium priority rows */
+        .priority-medium {
+            background-color: #4a3a1a !important;
+            color: #ffffff !important;
+        }
+        
+        /* Low priority rows */
+        .priority-low {
+            background-color: #1a4a1a !important;
+            color: #ffffff !important;
+        }
+        
 
-</style>
-""", unsafe_allow_html=True)
+    </style>
+    """, unsafe_allow_html=True)
 
 def estimate_keyword_difficulty(keyword):
     """Estimate keyword difficulty based on keyword characteristics."""

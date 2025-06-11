@@ -90,9 +90,9 @@ import os
 # Add current directory to path so we can import our modules
 sys.path.append(os.path.dirname(__file__))
 
-# Import the dashboard functions
-from dashboard import main as seo_main, display_glossary as seo_glossary
-from aeo_geo_dashboard import main as aeo_main
+# Import the dashboard functions lazily to prevent startup delays
+# from dashboard import main as seo_main, display_glossary as seo_glossary
+# from aeo_geo_dashboard import main as aeo_main
 
 def main():
     """Main application with navigation between SEO and AEO/GEO dashboards."""
@@ -127,13 +127,20 @@ def main():
 
 def seo_dashboard():
     """SEO dashboard without navigation sidebar."""
-    # Import the functions we need from dashboard.py
-    from dashboard import (
-        load_latest_data, create_summary_metrics, create_visualizations,
-        filter_dataframe, display_paginated_table, export_filtered_data,
-        display_glossary
-    )
-    from datetime import datetime
+    # Lazy import to prevent startup delays
+    try:
+        from dashboard import (
+            apply_dashboard_styling, load_latest_data, create_summary_metrics, create_visualizations,
+            filter_dataframe, display_paginated_table, export_filtered_data,
+            display_glossary
+        )
+        from datetime import datetime
+    except ImportError as e:
+        st.error(f"❌ Error importing dashboard modules: {str(e)}")
+        return
+    
+    # Apply styling
+    apply_dashboard_styling()
     
     # Header
     st.title("🎯 SEO Keyword Opportunities Dashboard")
@@ -207,11 +214,15 @@ def seo_dashboard():
 
 def aeo_dashboard():
     """AEO/GEO dashboard without navigation sidebar."""
-    # Import the functions we need from aeo_geo_dashboard.py
-    from aeo_geo_dashboard import (
-        get_aeo_data_from_session, create_summary_metrics, create_visualizations,
-        display_analysis_table, display_insights, display_glossary
-    )
+    # Lazy import to prevent startup delays
+    try:
+        from aeo_geo_dashboard import (
+            get_aeo_data_from_session, create_summary_metrics, create_visualizations,
+            display_analysis_table, display_insights, display_glossary
+        )
+    except ImportError as e:
+        st.error(f"❌ Error importing AEO dashboard modules: {str(e)}")
+        return
     
     # Header
     st.title("🤖 AEO/GEO Analysis Dashboard")
